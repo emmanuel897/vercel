@@ -104,7 +104,8 @@ export default function Home() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              style={{ color: '#111827', backgroundColor: '#ffffff' }}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
           <div className="mb-4">
@@ -113,7 +114,8 @@ export default function Home() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              style={{ color: '#111827', backgroundColor: '#ffffff' }}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
           <button
@@ -144,13 +146,15 @@ export default function Home() {
                   <input
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="mb-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    style={{ color: '#111827', backgroundColor: '#ffffff' }}
+                    className="mb-2 w-full rounded-lg border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                   <textarea
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
                     rows={2}
-                    className="mb-3 w-full rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    style={{ color: '#111827', backgroundColor: '#ffffff' }}
+                    className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                   <div className="flex gap-2">
                     <button
