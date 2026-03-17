@@ -1,220 +1,242 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Task } from "@/lib/supabase";
+import Link from "next/link";
+import Navbar from "@/components/Navbar";
+import type {
+  Podcast,
+  PodcastCategory,
+  PodcastDuration,
+  ReactionType,
+} from "@/lib/supabase";
+import { REACTION_CONFIG, PODCAST_CATEGORIES } from "@/lib/supabase";
+import { useAuth } from "@/lib/useAuth";
 
-export default function Home() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+const DURATION_LABELS: Record<PodcastDuration, string> = {
+  courte: "< 30 min",
+  moyenne: "30–60 min",
+  longue: "> 60 min",
+};
+
+export default function HomePage() {
+  const { friend, accessToken } = useAuth();
+  const [podcasts, setPodcasts] = useState<Podcast[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  // Filtres
+  const [filterCategory, setFilterCategory] = useState<PodcastCategory | "">("");
+  const [filterDuration, setFilterDuration] = useState<PodcastDuration | "">("");
+  const [filterFriend, setFilterFriend] = useState("");
 
-  // Edit state
-  const [editId, setEditId] = useState<number | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-
-  async function fetchTasks() {
+  async function fetchPodcasts() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/tasks");
-      if (!res.ok) throw new Error("Failed to load tasks");
-      setTasks(await res.json());
+      const params = new URLSearchParams();
+      if (filterCategory) params.set("category", filterCategory);
+      if (filterDuration) params.set("duration", filterDuration);
+      if (filterFriend) params.set("friend", filterFriend);
+
+      const headers: Record<string, string> = {};
+      if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+
+      const res = await fetch(`/api/podcasts?${params}`, { headers });
+      if (!res.ok) throw new Error("Erreur lors du chargement des podcasts.");
+      setPodcasts(await res.json());
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchTasks();
-  }, []);
+    fetchPodcasts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterCategory, filterDuration, filterFriend, accessToken]);
 
-  async function createTask(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description }),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        throw new Error(json.error ?? "Failed to create task");
-      }
-      setTitle("");
-      setDescription("");
-      await fetchTasks();
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Error");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function toggleDone(task: Task) {
-    await fetch(`/api/tasks/${task.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !task.done }),
+  async function handleReaction(podcastId: string, type: ReactionType) {
+    if (!accessToken) return;
+    await fetch(`/api/podcasts/${podcastId}/reactions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ type }),
     });
-    await fetchTasks();
-  }
-
-  async function deleteTask(id: number) {
-    await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-    await fetchTasks();
-  }
-
-  async function saveEdit(id: number) {
-    await fetch(`/api/tasks/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: editTitle, description: editDescription }),
-    });
-    setEditId(null);
-    await fetchTasks();
+    fetchPodcasts();
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <div className="mx-auto max-w-2xl">
-        <h1 className="mb-8 text-3xl font-bold text-gray-800">
-          Task Manager{" "}
-          <span className="text-sm font-normal text-gray-400">(Supabase CRUD)</span>
-        </h1>
+    <>
+      <Navbar />
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        {/* En-tête */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-800">Podcasts partagés</h1>
+          <p className="text-gray-500 mt-1 text-sm">
+            Découvrez les recommandations de la communauté.
+          </p>
+        </div>
 
-        {/* Create form */}
-        <form
-          onSubmit={createTask}
-          className="mb-8 rounded-xl bg-white p-6 shadow-sm border border-gray-100"
-        >
-          <h2 className="mb-4 text-lg font-semibold text-gray-700">New task</h2>
-          <div className="mb-3">
-            <input
-              type="text"
-              placeholder="Title *"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
-          <div className="mb-4">
-            <textarea
-              placeholder="Description (optional)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        {/* Filtres */}
+        <div className="flex flex-wrap gap-3 mb-8">
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value as PodcastCategory | "")}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
           >
-            {submitting ? "Adding..." : "Add task"}
-          </button>
-        </form>
+            <option value="">Toutes catégories</option>
+            {PODCAST_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
 
-        {/* Task list */}
-        {loading && <p className="text-gray-500 text-sm">Loading…</p>}
-        {error && <p className="text-red-500 text-sm">{error}</p>}
-        {!loading && tasks.length === 0 && (
-          <p className="text-gray-400 text-sm">No tasks yet. Create one above!</p>
+          <select
+            value={filterDuration}
+            onChange={(e) => setFilterDuration(e.target.value as PodcastDuration | "")}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+            <option value="">Toutes durées</option>
+            <option value="courte">Courte (&lt; 30 min)</option>
+            <option value="moyenne">Moyenne (30–60 min)</option>
+            <option value="longue">Longue (&gt; 60 min)</option>
+          </select>
+        </div>
+
+        {/* Liste */}
+        {loading && (
+          <div className="text-center py-12 text-gray-400 text-sm">
+            Chargement…
+          </div>
+        )}
+        {error && (
+          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+        {!loading && podcasts.length === 0 && (
+          <div className="text-center py-16 text-gray-400">
+            <div className="text-5xl mb-3">🎙️</div>
+            <p>Aucun podcast partagé pour le moment.</p>
+            {friend && (
+              <Link
+                href="/podcasts/nouveau"
+                className="mt-4 inline-block text-indigo-600 hover:underline text-sm"
+              >
+                Partagez le premier !
+              </Link>
+            )}
+          </div>
         )}
 
-        <ul className="space-y-3">
-          {tasks.map((task) => (
-            <li
-              key={task.id}
-              className="rounded-xl bg-white p-4 shadow-sm border border-gray-100"
-            >
-              {editId === task.id ? (
-                /* Edit mode */
-                <div>
-                  <input
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    className="mb-2 w-full rounded-lg border border-gray-200 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                  <textarea
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    rows={2}
-                    className="mb-3 w-full rounded-lg border border-gray-200 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => saveEdit(task.id)}
-                      className="rounded-lg bg-green-600 px-4 py-1 text-sm font-medium text-white hover:bg-green-700"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditId(null)}
-                      className="rounded-lg bg-gray-200 px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-300"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* View mode */
-                <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={task.done}
-                    onChange={() => toggleDone(task)}
-                    className="mt-1 h-4 w-4 cursor-pointer accent-blue-600"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`font-medium text-gray-800 ${
-                        task.done ? "line-through text-gray-400" : ""
-                      }`}
-                    >
-                      {task.title}
-                    </p>
-                    {task.description && (
-                      <p className="mt-0.5 text-sm text-gray-500">{task.description}</p>
-                    )}
-                    <p className="mt-1 text-xs text-gray-300">
-                      {new Date(task.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() => {
-                        setEditId(task.id);
-                        setEditTitle(task.title);
-                        setEditDescription(task.description ?? "");
-                      }}
-                      className="rounded-lg bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700 hover:bg-yellow-200"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => deleteTask(task.id)}
-                      className="rounded-lg bg-red-100 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-200"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )}
-            </li>
+        <div className="space-y-4">
+          {podcasts.map((podcast) => (
+            <PodcastCard
+              key={podcast.id}
+              podcast={podcast}
+              isFriend={!!friend}
+              onReact={(type) => handleReaction(podcast.id, type)}
+            />
           ))}
-        </ul>
+        </div>
+      </main>
+    </>
+  );
+}
+
+function PodcastCard({
+  podcast,
+  isFriend,
+  onReact,
+}: {
+  podcast: Podcast;
+  isFriend: boolean;
+  onReact: (type: ReactionType) => void;
+}) {
+  const counts = podcast.reaction_counts ?? {
+    interesse: 0,
+    pas_interesse: 0,
+    ecoute: 0,
+    conseille: 0,
+  };
+
+  return (
+    <article className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 text-xs text-gray-400 mb-1.5">
+            <span className="bg-indigo-50 text-indigo-600 font-medium px-2 py-0.5 rounded-full">
+              {podcast.category}
+            </span>
+            <span className="bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full">
+              {DURATION_LABELS[podcast.duration]}
+            </span>
+            {podcast.friend && (
+              <span>par {podcast.friend.display_name}</span>
+            )}
+          </div>
+
+          <Link href={`/podcasts/${podcast.id}`}>
+            <h2 className="text-base font-semibold text-gray-800 hover:text-indigo-700 transition-colors line-clamp-2">
+              {podcast.title}
+            </h2>
+          </Link>
+
+          {podcast.description && (
+            <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+              {podcast.description}
+            </p>
+          )}
+
+          <p className="text-xs text-gray-300 mt-2">
+            {new Date(podcast.created_at).toLocaleDateString("fr-FR", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
+        </div>
+
+        <a
+          href={podcast.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 rounded-lg bg-indigo-50 text-indigo-600 px-3 py-2 text-xs font-medium hover:bg-indigo-100 transition-colors"
+        >
+          Écouter ↗
+        </a>
       </div>
-    </main>
+
+      {/* Réactions */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {(Object.entries(REACTION_CONFIG) as [ReactionType, { emoji: string; label: string }][]).map(
+          ([type, cfg]) => (
+            <button
+              key={type}
+              onClick={() => isFriend && onReact(type)}
+              disabled={!isFriend}
+              title={isFriend ? cfg.label : "Connectez-vous pour réagir"}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border transition-colors
+                ${
+                  podcast.my_reaction === type
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-indigo-50 hover:border-indigo-300"
+                }
+                ${!isFriend ? "cursor-default opacity-70" : "cursor-pointer"}
+              `}
+            >
+              <span>{cfg.emoji}</span>
+              <span>{cfg.label}</span>
+              <span className="font-medium">{counts[type]}</span>
+            </button>
+          )
+        )}
+      </div>
+    </article>
   );
 }
