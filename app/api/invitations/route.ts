@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdminSupabase, getServerSupabase } from "@/lib/auth";
+import { getAdminSupabase } from "@/lib/auth";
 
 // POST /api/invitations — valider un token d'invitation et créer le compte
 export async function POST(req: Request) {
@@ -18,19 +18,30 @@ export async function POST(req: Request) {
     );
   }
 
-  const supabase = getServerSupabase();
   const adminSupabase = getAdminSupabase();
 
-  // Vérifier le token
-  const { data: invitation } = await supabase
+  // Vérifier le token via le client admin (bypasse RLS pour avoir un message précis)
+  const { data: invitation } = await adminSupabase
     .from("invitations")
     .select("id, friend_id, used, expires_at")
     .eq("token", token)
     .single();
 
-  if (!invitation || invitation.used || new Date(invitation.expires_at) < new Date()) {
+  if (!invitation) {
     return NextResponse.json(
-      { error: "Invitation invalide ou expirée." },
+      { error: "Token d'invitation introuvable." },
+      { status: 400 }
+    );
+  }
+  if (invitation.used) {
+    return NextResponse.json(
+      { error: "Cette invitation a déjà été utilisée." },
+      { status: 400 }
+    );
+  }
+  if (new Date(invitation.expires_at) < new Date()) {
+    return NextResponse.json(
+      { error: "Cette invitation a expiré. Contactez l'administrateur pour un nouveau lien." },
       { status: 400 }
     );
   }
